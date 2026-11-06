@@ -1,7 +1,7 @@
 import express from "express"
 import  connectToDb from "./config/db.js"
 import dotenv from "dotenv"
-
+import router from "./routes/auth.route.js"
 
 dotenv.config()
 
