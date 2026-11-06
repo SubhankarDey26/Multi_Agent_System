@@ -27,10 +27,29 @@ export const Sidebar = () => {
     createNewTask,
     user,
     logoutUser,
+    showToast,
+    requestConfirm,
   } = useAppStore();
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleLogout = () => {
+    requestConfirm({
+      title: 'Sign Out of Cortex AI',
+      message: `Are you sure you want to end your session as ${user?.name || 'Operator'}?`,
+      confirmText: 'Sign Out',
+      onConfirm: async () => {
+        try {
+          await logoutUser();
+          showToast('Logged out successfully', 'success');
+          navigate('/login');
+        } catch (err) {
+          showToast('Error signing out', 'error');
+        }
+      },
+    });
+  };
 
   const handleAgentClick = (agent) => {
     setActiveAgentId(agent.id);
@@ -317,13 +336,21 @@ export const Sidebar = () => {
               )}
             </div>
 
-            {!isSidebarCollapsed && (
+            {!isSidebarCollapsed ? (
               <button
-                onClick={logoutUser}
+                onClick={handleLogout}
                 className="p-1 rounded text-[#94A3B8] hover:text-red-400 hover:bg-[#121620] transition-colors"
-                title="Sign out"
+                title="Sign out / Logout"
               >
                 <LogOut className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <button
+                onClick={handleLogout}
+                className="sr-only"
+                title="Sign out"
+              >
+                Sign out
               </button>
             )}
           </div>

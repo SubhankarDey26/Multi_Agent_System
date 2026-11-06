@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import MobileSidebar from './MobileSidebar';
 import Topbar from './Topbar';
@@ -8,7 +8,11 @@ import ConfirmDialog from '../common/ConfirmDialog';
 import { useAppStore } from '../../store/useAppStore';
 
 export const AppShell = () => {
-  const { isSidebarCollapsed } = useAppStore();
+  const { isSidebarCollapsed, user } = useAppStore();
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-[#0B0D12] text-[#F1F5F9] flex flex-col font-sans selection:bg-[#8B7CFF]/30 selection:text-white">

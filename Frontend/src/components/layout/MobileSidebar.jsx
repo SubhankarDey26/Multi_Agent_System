@@ -25,10 +25,30 @@ export const MobileSidebar = () => {
     createNewTask,
     user,
     logoutUser,
+    showToast,
+    requestConfirm,
   } = useAppStore();
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleLogout = () => {
+    setMobileSidebarOpen(false);
+    requestConfirm({
+      title: 'Sign Out of Cortex AI',
+      message: `Are you sure you want to end your mobile session as ${user?.name || 'Operator'}?`,
+      confirmText: 'Sign Out',
+      onConfirm: async () => {
+        try {
+          await logoutUser();
+          showToast('Logged out successfully', 'success');
+          navigate('/login');
+        } catch (err) {
+          showToast('Error signing out', 'error');
+        }
+      },
+    });
+  };
 
   // Close drawer on route change
   useEffect(() => {
@@ -191,9 +211,9 @@ export const MobileSidebar = () => {
                 </div>
               </div>
               <button
-                onClick={logoutUser}
-                className="p-1 rounded text-[#94A3B8] hover:text-red-400"
-                title="Sign out"
+                onClick={handleLogout}
+                className="p-1.5 rounded-lg text-[#94A3B8] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                title="Sign out / Logout"
               >
                 <LogOut className="w-4 h-4" />
               </button>

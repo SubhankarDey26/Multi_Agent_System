@@ -28,24 +28,19 @@ export const AppStoreProvider = ({ children }) => {
 
   // Auth state
   const [user, setUser] = useState(() => {
-    return (
-      authService.getCurrentUser() || {
-        uid: 'demo-user-1',
-        name: 'Alex Vance',
-        email: 'alex.vance@cortex.ai',
-        photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
-        plan: 'Pro Plan',
-        isDemo: true,
-      }
-    );
+    return authService.getCurrentUser();
   });
 
   const loginUser = (userData) => {
     setUser(userData);
   };
 
-  const logoutUser = () => {
-    authService.logout();
+  const logoutUser = async () => {
+    try {
+      await authService.logout();
+    } catch (err) {
+      console.warn('Logout error:', err);
+    }
     setUser(null);
   };
 
