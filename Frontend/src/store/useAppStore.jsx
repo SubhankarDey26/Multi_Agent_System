@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_CONVERSATIONS, SAMPLE_CHAT_MESSAGES, SAMPLE_CODING_MESSAGES, AGENTS } from '../mocks/mockData';
 import authService from '../services/authService';
 
 const AppStoreContext = createContext(null);
@@ -32,7 +31,8 @@ export const AppStoreProvider = ({ children }) => {
   });
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // Re-verify session with Backend Gateway API (/api/me) on application load
+  // Automatic session verification via Backend Gateway API (/api/me)
+  // Backend protect middleware verifies the session in Redis (7-Day TTL)
   useEffect(() => {
     let isMounted = true;
     const verifyUserSession = async () => {
@@ -81,7 +81,7 @@ export const AppStoreProvider = ({ children }) => {
     }
   };
 
-  // Sidebar states
+  // Sidebar collapsed state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem('cortex_sidebar_collapsed') === 'true';
   });
@@ -96,38 +96,15 @@ export const AppStoreProvider = ({ children }) => {
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  // Active agent & conversations (persisted across page refresh)
-  const [activeAgentId, setActiveAgentId] = useState(() => {
-    return localStorage.getItem('cortex_active_agent') || 'chat';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('cortex_active_agent', activeAgentId);
-  }, [activeAgentId]);
-
-  const [conversations, setConversations] = useState(() => {
-    try {
-      const saved = localStorage.getItem('cortex_conversations');
-      if (saved) return JSON.parse(saved);
-    } catch (err) {
-      console.warn('Failed to parse cortex_conversations:', err);
-    }
-    return INITIAL_CONVERSATIONS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('cortex_conversations', JSON.stringify(conversations));
-  }, [conversations]);
-
+  // Workspace conversations & messages state (persisted across page refresh)
   const [currentConversationId, setCurrentConversationId] = useState(() => {
-    return localStorage.getItem('cortex_current_task_id') || 'task-1';
+    return localStorage.getItem('cortex_current_task_id') || 'workspace-main';
   });
 
   useEffect(() => {
     localStorage.setItem('cortex_current_task_id', currentConversationId);
   }, [currentConversationId]);
 
-  // Messages repository { [conversationId]: Array<Message> } (persisted across page refresh)
   const [messagesMap, setMessagesMap] = useState(() => {
     try {
       const saved = localStorage.getItem('cortex_messages_map');
@@ -136,8 +113,7 @@ export const AppStoreProvider = ({ children }) => {
       console.warn('Failed to parse cortex_messages_map:', err);
     }
     return {
-      'task-1': SAMPLE_CHAT_MESSAGES,
-      'task-2': SAMPLE_CODING_MESSAGES,
+      'workspace-main': [],
     };
   });
 
@@ -145,77 +121,12 @@ export const AppStoreProvider = ({ children }) => {
     localStorage.setItem('cortex_messages_map', JSON.stringify(messagesMap));
   }, [messagesMap]);
 
-  const createNewTask = (agentId = activeAgentId, customTitle) => {
-    const agent = AGENTS.find((a) => a.id === agentId) || AGENTS[0];
-    const newId = 'task-' + Date.now();
-    const newTask = {
-      id: newId,
-      agentId: agent.id,
-      title: customTitle || `New ${agent.name} Task`,
-      dateGroup: 'Today',
-      updatedAt: 'Just now',
-      messagesCount: 0,
-    };
-
-    setConversations((prev) => [newTask, ...prev]);
-    setCurrentConversationId(newId);
-    setMessagesMap((prev) => ({
-      ...prev,
-      [newId]: [],
-    }));
-    return newTask;
-  };
-
-  const deleteTask = (taskId) => {
-    setConversations((prev) => prev.filter((t) => t.id !== taskId));
-    setMessagesMap((prev) => {
-      const next = { ...prev };
-      delete next[taskId];
-      return next;
-    });
-    if (currentConversationId === taskId) {
-      const remaining = conversations.filter((t) => t.id !== taskId);
-      if (remaining.length > 0) {
-        setCurrentConversationId(remaining[0].id);
-      } else {
-        const newTask = createNewTask(activeAgentId);
-        setCurrentConversationId(newTask.id);
-      }
-    }
-  };
-
   const addMessage = (conversationId, message) => {
     setMessagesMap((prev) => {
       const list = prev[conversationId] || [];
       return {
         ...prev,
         [conversationId]: [...list, message],
-      };
-    });
-  };
-
-  const updateStreamingMessage = (conversationId, messageId, content) => {
-    setMessagesMap((prev) => {
-      const list = prev[conversationId] || [];
-      const updated = list.map((msg) =>
-        msg.id === messageId ? { ...msg, content, isStreaming: true } : msg
-      );
-      return {
-        ...prev,
-        [conversationId]: updated,
-      };
-    });
-  };
-
-  const finalizeStreamingMessage = (conversationId, messageId, finalPayload = {}) => {
-    setMessagesMap((prev) => {
-      const list = prev[conversationId] || [];
-      const updated = list.map((msg) =>
-        msg.id === messageId ? { ...msg, ...finalPayload, isStreaming: false } : msg
-      );
-      return {
-        ...prev,
-        [conversationId]: updated,
       };
     });
   };
@@ -260,17 +171,10 @@ export const AppStoreProvider = ({ children }) => {
         toggleSidebarCollapse,
         mobileSidebarOpen,
         setMobileSidebarOpen,
-        activeAgentId,
-        setActiveAgentId,
-        conversations,
         currentConversationId,
         setCurrentConversationId,
         messagesMap,
-        createNewTask,
-        deleteTask,
         addMessage,
-        updateStreamingMessage,
-        finalizeStreamingMessage,
         toast,
         showToast,
         confirmState,

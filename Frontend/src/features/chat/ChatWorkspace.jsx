@@ -1,187 +1,179 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  FileSpreadsheet,
-  FileCode,
-  Radar,
-  Network,
   Sparkles,
+  Bot,
+  User,
+  Send,
+  AlertCircle,
+  Terminal,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import ChatMessage from '../../components/chat/ChatMessage';
-import MessageComposer from '../../components/chat/MessageComposer';
-import PromptSuggestionCard from '../../components/chat/PromptSuggestionCard';
-import chatService from '../../services/chatService';
-
-const SUGGESTIONS = [
-  {
-    icon: FileSpreadsheet,
-    title: 'Analyze Quarterly Financials',
-    description: 'Upload P&L statements & generate variance summaries',
-    prompt: 'Analyze our quarterly financial statements and generate variance summaries for Q3 vs Q2.',
-    accent: 'violet',
-  },
-  {
-    icon: FileCode,
-    title: 'Draft Product Requirements',
-    description: 'Auto-structure PRD with user stories & API contracts',
-    prompt: 'Draft a comprehensive Product Requirements Document (PRD) for a multi-agent AI workspace with user stories and endpoint schemas.',
-    accent: 'cyan',
-  },
-  {
-    icon: Radar,
-    title: 'Deep Competitive Intelligence',
-    description: 'Synthesize top 5 rivals across pricing, features & sentiment',
-    prompt: 'Synthesize competitive intelligence on top 5 developer AI workspace tools comparing pricing, latency, and agent orchestration.',
-    accent: 'violet',
-  },
-  {
-    icon: Network,
-    title: 'Architect Distributed System',
-    description: 'Generate system diagrams, schema, and latency models',
-    prompt: 'Architect a low-latency event-driven distributed system for telemetry streaming with Redis Cluster and Shared Workers.',
-    accent: 'cyan',
-  },
-];
 
 export const ChatWorkspace = () => {
   const {
     currentConversationId,
     messagesMap,
     addMessage,
-    updateStreamingMessage,
-    finalizeStreamingMessage,
     user,
-    showToast,
   } = useAppStore();
 
   const messages = messagesMap[currentConversationId] || [];
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [inputValue, setInputValue] = useState('');
   const scrollRef = useRef(null);
 
-  // Auto scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isGenerating]);
+  }, [messages]);
 
-  const handleSend = async ({ content, webSearch, files }) => {
+  const handleSend = (e) => {
+    e?.preventDefault();
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
+
     // 1. Add user message
     const userMsg = {
       id: 'msg-' + Date.now(),
       role: 'user',
-      content,
+      content: trimmed,
       timestamp: 'Just now',
-      files,
     };
     addMessage(currentConversationId, userMsg);
+    setInputValue('');
 
-    // 2. Add placeholder assistant message
-    const assistantMsgId = 'msg-assist-' + Date.now();
-    const placeholderAssistantMsg = {
-      id: assistantMsgId,
-      role: 'assistant',
-      agentId: 'chat',
-      content: '',
-      isStreaming: true,
-      timestamp: 'Just now',
-      model: 'Cortex Omni 3.5',
-    };
-    addMessage(currentConversationId, placeholderAssistantMsg);
-    setIsGenerating(true);
-
-    try {
-      await chatService.streamResponse(
-        content,
-        'chat',
-        (chunk) => {
-          updateStreamingMessage(currentConversationId, assistantMsgId, chunk);
-        },
-        (finalText) => {
-          finalizeStreamingMessage(currentConversationId, assistantMsgId, {
-            content: finalText,
-            latency: '1.2s',
-            citations: webSearch
-              ? [
-                  { title: 'Live Web Index Synthesis', url: 'https://cortex.ai/sources/live' },
-                  { title: 'Grounding Verification Vector', url: 'https://cortex.ai/sources/verified' },
-                ]
-              : undefined,
-          });
-          setIsGenerating(false);
-        }
-      );
-    } catch (err) {
-      finalizeStreamingMessage(currentConversationId, assistantMsgId, {
-        content: 'An error occurred while generating response: ' + (err.message || 'Unknown error'),
-      });
-      setIsGenerating(false);
-      showToast('Error during generation', 'error');
-    }
-  };
-
-  const handleStop = () => {
-    setIsGenerating(false);
-    showToast('Generation cancelled', 'info');
+    // 2. Add assistant message indicating backend service pending
+    setTimeout(() => {
+      const assistantMsg = {
+        id: 'msg-assist-' + Date.now(),
+        role: 'assistant',
+        content:
+          'Backend chat service is not yet implemented. Once you connect your LLM backend endpoint in the Gateway, live responses will stream directly here.',
+        timestamp: 'Just now',
+        isNotice: true,
+      };
+      addMessage(currentConversationId, assistantMsg);
+    }, 400);
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-5xl mx-auto w-full px-4 sm:px-6 pt-6 pb-6 relative min-h-[calc(100vh-4rem)]">
-      {/* Scrollable messages and greeting */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-6 pb-32">
+    <div className="flex-1 flex flex-col h-[calc(100vh-4rem)] relative bg-[#0B0D12] overflow-hidden">
+      {/* Background ambient lighting */}
+      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-[#8B7CFF]/5 rounded-full blur-[140px] pointer-events-none"></div>
+
+      {/* Messages Canvas */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6">
         {messages.length === 0 ? (
-          <div className="flex flex-col gap-6 pt-6 animate-in fade-in duration-300">
-            {/* Hero Greeting */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#8B7CFF]/10 text-[#8B7CFF] border border-[#8B7CFF]/25 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#8B7CFF]"></span>
-                  Multi-Agent Neural Fabric Active
-                </span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#F1F5F9] via-[#8B7CFF] to-[#56CFE1]">
-                What would you like to work on, {user?.name?.split(' ')[0] || 'Operator'}?
-              </h1>
-              <p className="text-sm text-[#94A3B8] max-w-2xl">
-                Chat Agent is orchestrated with live web search, code sandbox, and multi-file reasoning capabilities.
-              </p>
+          <div className="max-w-2xl mx-auto flex flex-col items-center justify-center text-center pt-16 pb-8">
+            <div className="w-14 h-14 rounded-2xl bg-[#181D2A] border border-[#232B3E] flex items-center justify-center text-[#8B7CFF] shadow-[0_0_24px_rgba(139,124,255,0.2)] mb-5">
+              <Sparkles className="w-7 h-7" />
             </div>
 
-            {/* 4 Bento Suggestion Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
-              {SUGGESTIONS.map((card, idx) => (
-                <PromptSuggestionCard
-                  key={idx}
-                  icon={card.icon}
-                  title={card.title}
-                  description={card.description}
-                  accent={card.accent}
-                  onClick={() => handleSend({ content: card.prompt, webSearch: false, files: [] })}
-                />
-              ))}
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F1F5F9] mb-2">
+              Welcome, {user?.name || 'Operator'}
+            </h1>
+            <p className="text-xs sm:text-sm text-[#94A3B8] max-w-md mb-8">
+              Your autonomous AI workspace is ready. Authenticated session active.
+            </p>
+
+            <div className="p-4 rounded-xl bg-[#121620] border border-[#232B3E] max-w-md w-full text-left flex items-start gap-3">
+              <Terminal className="w-4 h-4 text-[#56CFE1] shrink-0 mt-0.5" />
+              <div className="text-xs text-[#94A3B8]">
+                <span className="font-semibold text-[#F1F5F9] block mb-0.5">Backend Status</span>
+                Auth Service and Session Gateway active. Ready for agent endpoint integration.
+              </div>
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="max-w-3xl mx-auto space-y-4">
             {messages.map((msg) => (
-              <ChatMessage
+              <div
                 key={msg.id}
-                message={msg}
-                onRegenerate={() => handleSend({ content: 'Regenerate response with deeper technical depth' })}
-              />
+                className={`flex gap-3 text-xs sm:text-sm ${
+                  msg.role === 'user' ? 'justify-end' : 'justify-start'
+                }`}
+              >
+                {msg.role !== 'user' && (
+                  <div className="w-7 h-7 rounded-lg bg-[#181D2A] border border-[#8B7CFF]/30 flex items-center justify-center text-[#8B7CFF] shrink-0 mt-0.5">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                )}
+
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-[#8B7CFF] text-[#0B0D12] font-medium rounded-tr-sm shadow-md'
+                      : msg.isNotice
+                      ? 'bg-[#121620] border border-[#56CFE1]/30 text-[#94A3B8] rounded-tl-sm'
+                      : 'bg-[#181D2A] border border-[#232B3E] text-[#F1F5F9] rounded-tl-sm'
+                  }`}
+                >
+                  {msg.isNotice && (
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#56CFE1] mb-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>Agent Service Integration Pending</span>
+                    </div>
+                  )}
+                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <span
+                    className={`text-[10px] block mt-1.5 ${
+                      msg.role === 'user' ? 'text-black/60 text-right' : 'text-[#94A3B8]/60'
+                    }`}
+                  >
+                    {msg.timestamp}
+                  </span>
+                </div>
+
+                {msg.role === 'user' && (
+                  <div className="w-7 h-7 rounded-lg bg-[#8B7CFF]/20 border border-[#8B7CFF]/40 flex items-center justify-center text-[#8B7CFF] shrink-0 mt-0.5 overflow-hidden">
+                    {user?.photoURL || user?.avatar ? (
+                      <img
+                        src={user.photoURL || user.avatar}
+                        alt="User"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-4 h-4" />
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Anchored Bottom Composer */}
-      <div className="sticky bottom-0 left-0 right-0 pt-2 pb-1 bg-gradient-to-t from-[#0B0D12] via-[#0B0D12]/90 to-transparent">
-        <MessageComposer
-          onSend={handleSend}
-          isGenerating={isGenerating}
-          onStop={handleStop}
-          activeAgentId="chat"
-        />
+      {/* Input Composer */}
+      <div className="p-4 sm:p-6 border-t border-[#232B3E] bg-[#0E1118]/80 backdrop-blur-md">
+        <form
+          onSubmit={handleSend}
+          className="max-w-3xl mx-auto relative rounded-2xl bg-[#121620] border border-[#232B3E] focus-within:border-[#8B7CFF]/60 shadow-lg transition-all"
+        >
+          <textarea
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend(e);
+              }
+            }}
+            placeholder="Send a prompt..."
+            rows={2}
+            className="w-full px-4 pt-3.5 pb-12 bg-transparent text-xs sm:text-sm text-[#F1F5F9] placeholder:text-[#94A3B8]/50 focus:outline-none resize-none"
+          />
+
+          <div className="absolute bottom-2.5 right-3 flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={!inputValue.trim()}
+              className="p-2 rounded-xl bg-[#8B7CFF] hover:bg-[#7C6BF0] text-[#0B0D12] transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-md"
+              title="Send Prompt"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
