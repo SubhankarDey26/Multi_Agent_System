@@ -201,10 +201,14 @@ export const MobileSidebar = () => {
             <span>Settings</span>
           </NavLink>
 
-          {user && (
+          {user ? (
             <div className="mt-2 p-2 rounded-xl bg-[#181D2A] border border-[#232B3E] flex items-center justify-between">
               <div className="flex items-center gap-2 truncate">
-                <img src={user.photoURL} alt={user.name} className="w-7 h-7 rounded-full object-cover" />
+                <img
+                  src={user.photoURL || user.avatar}
+                  alt={user.name}
+                  className="w-7 h-7 rounded-full object-cover"
+                />
                 <div className="flex flex-col truncate">
                   <span className="text-xs font-medium text-[#F1F5F9] truncate">{user.name}</span>
                   <span className="text-[10px] text-[#94A3B8] truncate">{user.email}</span>
@@ -218,6 +222,13 @@ export const MobileSidebar = () => {
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
+          ) : (
+            <NavLink
+              to="/login"
+              className="mt-2 p-2.5 rounded-xl bg-[#181D2A] hover:bg-[#232B3E] border border-[#232B3E] hover:border-[#8B7CFF]/40 text-center text-xs font-semibold text-[#8B7CFF] transition-colors"
+            >
+              Sign In to Workspace
+            </NavLink>
           )}
         </div>
       </div>

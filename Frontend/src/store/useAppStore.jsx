@@ -28,8 +28,34 @@ export const AppStoreProvider = ({ children }) => {
 
   // Auth state
   const [user, setUser] = useState(() => {
-    return authService.getCurrentUser();
+    return authService.getStoredUser();
   });
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  // Re-verify session with Backend Gateway API (/api/me) on application load
+  useEffect(() => {
+    let isMounted = true;
+    const verifyUserSession = async () => {
+      try {
+        const remoteUser = await authService.getCurrentUser();
+        if (isMounted) {
+          setUser(remoteUser);
+        }
+      } catch (err) {
+        console.warn('Backend session verification warning:', err);
+      } finally {
+        if (isMounted) {
+          setIsAuthLoading(false);
+        }
+      }
+    };
+
+    verifyUserSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const loginUser = (userData) => {
     setUser(userData);
@@ -42,6 +68,17 @@ export const AppStoreProvider = ({ children }) => {
       console.warn('Logout error:', err);
     }
     setUser(null);
+  };
+
+  const refreshUser = async () => {
+    setIsAuthLoading(true);
+    try {
+      const updated = await authService.getCurrentUser();
+      setUser(updated);
+      return updated;
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
 
   // Sidebar states
@@ -59,16 +96,54 @@ export const AppStoreProvider = ({ children }) => {
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  // Active agent & conversations
-  const [activeAgentId, setActiveAgentId] = useState('chat');
-  const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
-  const [currentConversationId, setCurrentConversationId] = useState('task-1');
-
-  // Messages repository { [conversationId]: Array<Message> }
-  const [messagesMap, setMessagesMap] = useState({
-    'task-1': SAMPLE_CHAT_MESSAGES,
-    'task-2': SAMPLE_CODING_MESSAGES,
+  // Active agent & conversations (persisted across page refresh)
+  const [activeAgentId, setActiveAgentId] = useState(() => {
+    return localStorage.getItem('cortex_active_agent') || 'chat';
   });
+
+  useEffect(() => {
+    localStorage.setItem('cortex_active_agent', activeAgentId);
+  }, [activeAgentId]);
+
+  const [conversations, setConversations] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cortex_conversations');
+      if (saved) return JSON.parse(saved);
+    } catch (err) {
+      console.warn('Failed to parse cortex_conversations:', err);
+    }
+    return INITIAL_CONVERSATIONS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cortex_conversations', JSON.stringify(conversations));
+  }, [conversations]);
+
+  const [currentConversationId, setCurrentConversationId] = useState(() => {
+    return localStorage.getItem('cortex_current_task_id') || 'task-1';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cortex_current_task_id', currentConversationId);
+  }, [currentConversationId]);
+
+  // Messages repository { [conversationId]: Array<Message> } (persisted across page refresh)
+  const [messagesMap, setMessagesMap] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cortex_messages_map');
+      if (saved) return JSON.parse(saved);
+    } catch (err) {
+      console.warn('Failed to parse cortex_messages_map:', err);
+    }
+    return {
+      'task-1': SAMPLE_CHAT_MESSAGES,
+      'task-2': SAMPLE_CODING_MESSAGES,
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cortex_messages_map', JSON.stringify(messagesMap));
+  }, [messagesMap]);
 
   const createNewTask = (agentId = activeAgentId, customTitle) => {
     const agent = AGENTS.find((a) => a.id === agentId) || AGENTS[0];
@@ -89,6 +164,24 @@ export const AppStoreProvider = ({ children }) => {
       [newId]: [],
     }));
     return newTask;
+  };
+
+  const deleteTask = (taskId) => {
+    setConversations((prev) => prev.filter((t) => t.id !== taskId));
+    setMessagesMap((prev) => {
+      const next = { ...prev };
+      delete next[taskId];
+      return next;
+    });
+    if (currentConversationId === taskId) {
+      const remaining = conversations.filter((t) => t.id !== taskId);
+      if (remaining.length > 0) {
+        setCurrentConversationId(remaining[0].id);
+      } else {
+        const newTask = createNewTask(activeAgentId);
+        setCurrentConversationId(newTask.id);
+      }
+    }
   };
 
   const addMessage = (conversationId, message) => {
@@ -157,8 +250,12 @@ export const AppStoreProvider = ({ children }) => {
         theme,
         toggleTheme,
         user,
+        setUser,
+        isAuthLoading,
         loginUser,
         logoutUser,
+        refreshUser,
+        getCurrentUser: () => authService.getCurrentUser(),
         isSidebarCollapsed,
         toggleSidebarCollapse,
         mobileSidebarOpen,
@@ -170,6 +267,7 @@ export const AppStoreProvider = ({ children }) => {
         setCurrentConversationId,
         messagesMap,
         createNewTask,
+        deleteTask,
         addMessage,
         updateStreamingMessage,
         finalizeStreamingMessage,

@@ -308,7 +308,7 @@ export const Sidebar = () => {
         </NavLink>
 
         {/* User Profile Card */}
-        {user && (
+        {user ? (
           <div
             className={`mt-1.5 p-2 rounded-xl bg-[#181D2A] border border-[#232B3E] flex items-center ${
               isSidebarCollapsed ? 'justify-center' : 'justify-between'
@@ -317,7 +317,7 @@ export const Sidebar = () => {
             <div className="flex items-center gap-2.5 overflow-hidden">
               <div className="relative shrink-0">
                 <img
-                  src={user.photoURL}
+                  src={user.photoURL || user.avatar}
                   alt={user.name}
                   className="w-7 h-7 rounded-full object-cover border border-[#232B3E]"
                 />
@@ -328,7 +328,7 @@ export const Sidebar = () => {
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-medium text-[#F1F5F9] truncate">{user.name}</span>
                     <span className="px-1 py-0.2 rounded text-[9px] font-semibold bg-[#8B7CFF]/15 text-[#8B7CFF]">
-                      Pro
+                      {user.plan || 'Pro'}
                     </span>
                   </div>
                   <span className="text-[10px] text-[#94A3B8] truncate">{user.email}</span>
@@ -354,6 +354,17 @@ export const Sidebar = () => {
               </button>
             )}
           </div>
+        ) : (
+          <NavLink
+            to="/login"
+            className={`mt-1.5 p-2 rounded-xl bg-[#181D2A] hover:bg-[#232B3E] border border-[#232B3E] hover:border-[#8B7CFF]/40 text-[#8B7CFF] flex items-center ${
+              isSidebarCollapsed ? 'justify-center' : 'justify-center gap-2'
+            } text-xs font-medium transition-colors`}
+            title="Sign In"
+          >
+            <LogOut className="w-3.5 h-3.5 rotate-180" />
+            {!isSidebarCollapsed && <span>Sign In</span>}
+          </NavLink>
         )}
       </div>
     </aside>

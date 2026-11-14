@@ -19,6 +19,7 @@ export const HistoryPage = () => {
     conversations,
     setCurrentConversationId,
     setActiveAgentId,
+    deleteTask,
     requestConfirm,
     showToast,
   } = useAppStore();
@@ -47,6 +48,7 @@ export const HistoryPage = () => {
       message: `Are you sure you want to delete "${task.title}"? This conversation history cannot be recovered.`,
       confirmText: 'Delete',
       onConfirm: () => {
+        deleteTask(task.id);
         showToast(`Task "${task.title}" deleted`, 'info');
       },
     });

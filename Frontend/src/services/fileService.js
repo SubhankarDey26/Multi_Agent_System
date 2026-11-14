@@ -1,6 +1,28 @@
 import { SAMPLE_FILES } from '../mocks/mockData';
 
-let filesStore = [...SAMPLE_FILES];
+const STORAGE_KEY = 'cortex_files_store';
+
+const getStoredFiles = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.warn('Failed to parse stored files:', err);
+  }
+  return [...SAMPLE_FILES];
+};
+
+let filesStore = getStoredFiles();
+
+const persistFiles = () => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filesStore));
+  } catch (err) {
+    console.warn('Failed to persist files:', err);
+  }
+};
 
 export const fileService = {
   getFiles() {
@@ -18,11 +40,13 @@ export const fileService = {
       status: 'Indexed & Ready',
     };
     filesStore = [newFile, ...filesStore];
+    persistFiles();
     return newFile;
   },
 
   deleteFile(fileId) {
     filesStore = filesStore.filter((f) => f.id !== fileId);
+    persistFiles();
     return true;
   },
 };

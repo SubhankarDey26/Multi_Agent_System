@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Settings,
   User,
@@ -24,6 +24,13 @@ export const SettingsPage = () => {
   const [defaultAgent, setDefaultAgent] = useState('chat');
   const [responseStyle, setResponseStyle] = useState('Detailed');
   const [streamSpeed, setStreamSpeed] = useState('Fast');
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setEmail(user.email || '');
+    }
+  }, [user]);
 
   const handleSaveProfile = (e) => {
     e.preventDefault();
@@ -59,12 +66,16 @@ export const SettingsPage = () => {
           <div className="flex flex-col sm:flex-row items-center gap-5">
             <div className="relative">
               <img
-                src={user?.photoURL}
+                src={
+                  user?.photoURL ||
+                  user?.avatar ||
+                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80'
+                }
                 alt="Profile"
                 className="w-16 h-16 rounded-2xl object-cover border-2 border-[#8B7CFF]/40 shadow-lg"
               />
               <span className="absolute -bottom-1 -right-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono bg-[#8B7CFF] text-black font-bold">
-                PRO
+                {user?.plan || 'PRO'}
               </span>
             </div>
 

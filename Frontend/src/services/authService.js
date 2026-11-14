@@ -2,7 +2,88 @@ import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../../utils/firebase.js';
 import api from '../../utils/axios.js';
 
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
 export const authService = {
+  /**
+   * Fetch current authenticated user from Backend Gateway API (/api/me)
+   * The browser automatically sends the HTTP-only 'session' cookie via withCredentials: true.
+   * Gateway protect middleware verifies the session in Redis (7 days TTL) and returns req.user.
+   */
+  async getCurrentUser() {
+    try {
+      const response = await api.get('/api/me');
+      const data = response.data;
+
+      if (!data) return null;
+
+      const avatarUrl =
+        data.avatar ||
+        data.photoURL ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80';
+
+      const userData = {
+        id: data.userId || data._id || data.id,
+        uid: data.userId || data.firebaseUid || data.uid,
+        name: data.name || 'Neural Architect',
+        email: data.email,
+        photoURL: avatarUrl,
+        avatar: avatarUrl,
+        plan: data.plan || 'Pro Plan',
+        isDemo: false,
+      };
+
+      // Persist for 7 days matching the Redis session expiration constraint
+      const expiresAt = Date.now() + SEVEN_DAYS_MS;
+      localStorage.setItem('cortex_user', JSON.stringify(userData));
+      localStorage.setItem('cortex_session_expires', String(expiresAt));
+      return userData;
+    } catch (error) {
+      const stored = authService.getStoredUser();
+
+      // If user is operating in Demo mode, keep their session across refreshes
+      if (stored?.isDemo) {
+        return stored;
+      }
+
+      // If backend returned 400 (unauthorized or session expired in Redis)
+      if (error.response?.status === 400 || error.response?.status === 401) {
+        localStorage.removeItem('cortex_user');
+        localStorage.removeItem('cortex_session_expires');
+        localStorage.removeItem('cortex_token');
+        return null;
+      }
+
+      // If backend was unreachable or network blip, preserve cached user within 7 days
+      const expiresAt = localStorage.getItem('cortex_session_expires');
+      if (stored && expiresAt && Date.now() < Number(expiresAt)) {
+        return stored;
+      }
+
+      return stored;
+    }
+  },
+
+  /**
+   * Synchronously get cached user from localStorage (for instant initial render without vanish or flicker)
+   */
+  getStoredUser() {
+    const raw = localStorage.getItem('cortex_user');
+    if (!raw) return null;
+    try {
+      const expiresAt = localStorage.getItem('cortex_session_expires');
+      if (expiresAt && Date.now() > Number(expiresAt)) {
+        localStorage.removeItem('cortex_user');
+        localStorage.removeItem('cortex_session_expires');
+        localStorage.removeItem('cortex_token');
+        return null;
+      }
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  },
+
   /**
    * Google Sign-in with Firebase Auth + Backend Auth API
    */
@@ -15,28 +96,34 @@ export const authService = {
 
       let serverUser = null;
       try {
-        // 2. Exchange Firebase token with backend gateway /auth/login
-        const response = await api.post('/auth/login', { token: idToken });
+        // 2. Exchange Firebase token with backend gateway /api/auth/login
+        // Backend creates Redis session (7 days) and sets httpOnly session cookie
+        const response = await api.post('/api/auth/login', { token: idToken });
         serverUser = response.data?.user;
       } catch (backendErr) {
-        console.warn('Backend /auth/login request encountered error, using client fallback:', backendErr);
+        console.warn('Backend /api/auth/login request encountered error, using client fallback:', backendErr);
       }
 
       // 3. Construct user model
+      const avatarUrl =
+        serverUser?.avatar ||
+        firebaseUser.photoURL ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80';
+
       const userData = {
         uid: serverUser?.firebaseUid || firebaseUser.uid,
         id: serverUser?._id,
         name: serverUser?.name || firebaseUser.displayName || 'Neural Architect',
         email: serverUser?.email || firebaseUser.email,
-        photoURL:
-          serverUser?.avatar ||
-          firebaseUser.photoURL ||
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+        photoURL: avatarUrl,
+        avatar: avatarUrl,
         plan: 'Pro Plan',
         isDemo: false,
       };
 
+      const expiresAt = Date.now() + SEVEN_DAYS_MS;
       localStorage.setItem('cortex_user', JSON.stringify(userData));
+      localStorage.setItem('cortex_session_expires', String(expiresAt));
       localStorage.setItem('cortex_token', idToken);
       return userData;
     } catch (error) {
@@ -64,11 +151,15 @@ export const authService = {
       email: email,
       photoURL:
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+      avatar:
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
       plan: 'Pro Plan',
       isDemo: true,
     };
 
+    const expiresAt = Date.now() + SEVEN_DAYS_MS;
     localStorage.setItem('cortex_user', JSON.stringify(demoUser));
+    localStorage.setItem('cortex_session_expires', String(expiresAt));
     localStorage.setItem('cortex_token', 'enterprise-session-token');
     return demoUser;
   },
@@ -83,36 +174,27 @@ export const authService = {
       email: email,
       photoURL:
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+      avatar:
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
       plan: 'Pro Plan',
       isDemo: true,
     };
+    const expiresAt = Date.now() + SEVEN_DAYS_MS;
     localStorage.setItem('cortex_user', JSON.stringify(demoUser));
+    localStorage.setItem('cortex_session_expires', String(expiresAt));
     localStorage.setItem('cortex_token', 'demo-jwt-token-xyz');
     return demoUser;
   },
 
   /**
-   * Get current authenticated user from storage
-   */
-  getCurrentUser() {
-    const raw = localStorage.getItem('cortex_user');
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  },
-
-  /**
-   * Logout user via Backend API + Firebase + Local Storage
+   * Logout user via Backend API (/api/auth/logout) + Firebase + Local Storage
    */
   async logout() {
     try {
-      // Call backend /auth/logout (clears Redis session and session cookie)
-      await api.get('/auth/logout');
+      // Call backend /api/auth/logout (clears Redis session and session cookie)
+      await api.get('/api/auth/logout');
     } catch (err) {
-      console.warn('Backend /auth/logout warning:', err);
+      console.warn('Backend /api/auth/logout warning:', err);
     }
 
     try {
@@ -124,6 +206,7 @@ export const authService = {
 
     // Clear client-side persisted session
     localStorage.removeItem('cortex_user');
+    localStorage.removeItem('cortex_session_expires');
     localStorage.removeItem('cortex_token');
     return true;
   },

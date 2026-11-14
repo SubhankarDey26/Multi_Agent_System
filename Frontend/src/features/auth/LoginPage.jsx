@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles,
@@ -14,7 +14,7 @@ import authService from '../../services/authService';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
-  const { loginUser, showToast } = useAppStore();
+  const { loginUser, showToast, user, isAuthLoading } = useAppStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,6 +22,13 @@ export const LoginPage = () => {
   const [rememberTerminal, setRememberTerminal] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // If already authenticated via 7-day session or local store, automatically route to workspace
+  useEffect(() => {
+    if (!isAuthLoading && user) {
+      navigate('/agent/chat', { replace: true });
+    }
+  }, [user, isAuthLoading, navigate]);
 
   // Google SSO Authentication via Firebase + Backend API
   const handleGoogleLogin = async () => {

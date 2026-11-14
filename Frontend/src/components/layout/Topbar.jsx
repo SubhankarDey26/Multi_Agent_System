@@ -188,7 +188,7 @@ export const Topbar = () => {
         )}
 
         {/* User Profile & Menu */}
-        {user && (
+        {user ? (
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setUserMenuOpen((prev) => !prev)}
@@ -196,7 +196,7 @@ export const Topbar = () => {
               title="User Account"
             >
               <img
-                src={user.photoURL}
+                src={user.photoURL || user.avatar}
                 alt={user.name}
                 className="w-7 h-7 rounded-full object-cover border border-[#232B3E]"
               />
@@ -207,7 +207,7 @@ export const Topbar = () => {
                 {/* Profile Header */}
                 <div className="p-2.5 border-b border-[#232B3E]/80 flex items-center gap-3">
                   <img
-                    src={user.photoURL}
+                    src={user.photoURL || user.avatar}
                     alt={user.name}
                     className="w-10 h-10 rounded-full object-cover border border-[#232B3E]"
                   />
@@ -255,6 +255,13 @@ export const Topbar = () => {
               </div>
             )}
           </div>
+        ) : (
+          <button
+            onClick={() => navigate('/login')}
+            className="px-3 py-1.5 rounded-xl bg-[#8B7CFF] hover:bg-[#7C6BF0] text-[#0B0D12] text-xs font-semibold transition-all shadow-[0_0_12px_rgba(139,124,255,0.3)] active:scale-95 ml-1"
+          >
+            Sign In
+          </button>
         )}
       </div>
     </header>

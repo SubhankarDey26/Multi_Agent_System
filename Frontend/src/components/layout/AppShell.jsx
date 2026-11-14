@@ -5,10 +5,20 @@ import MobileSidebar from './MobileSidebar';
 import Topbar from './Topbar';
 import Toast from '../common/Toast';
 import ConfirmDialog from '../common/ConfirmDialog';
+import LoadingState from '../common/LoadingState';
 import { useAppStore } from '../../store/useAppStore';
 
 export const AppShell = () => {
-  const { isSidebarCollapsed, user } = useAppStore();
+  const { isSidebarCollapsed, user, isAuthLoading } = useAppStore();
+
+  // If initial authentication check with backend is still running and no cached user exists
+  if (!user && isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[#0B0D12] text-[#F1F5F9] flex items-center justify-center">
+        <LoadingState message="Verifying session..." />
+      </div>
+    );
+  }
 
   if (!user) {
     return <Navigate to="/login" replace />;
