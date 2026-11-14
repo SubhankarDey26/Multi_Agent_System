@@ -22,21 +22,15 @@ export const Sidebar = () => {
 
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    requestConfirm({
-      title: 'Sign Out of Cortex AI',
-      message: `Are you sure you want to end your session as ${user?.name || 'Operator'}?`,
-      confirmText: 'Sign Out',
-      onConfirm: async () => {
-        try {
-          await logoutUser();
-          showToast('Logged out successfully', 'success');
-          navigate('/login');
-        } catch (err) {
-          showToast('Error signing out', 'error');
-        }
-      },
-    });
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      showToast('Logged out successfully', 'success');
+    } catch (err) {
+      console.warn('Logout error:', err);
+    } finally {
+      navigate('/login', { replace: true });
+    }
   };
 
   return (

@@ -2,8 +2,8 @@ import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import AppShell from '../components/layout/AppShell';
 import LoadingState from '../components/common/LoadingState';
+import LoginPage from '../features/auth/LoginPage';
 
-const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 const ChatWorkspace = lazy(() => import('../features/chat/ChatWorkspace'));
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage'));
 
@@ -16,11 +16,7 @@ const SuspenseWrapper = ({ children }) => (
 export const router = createBrowserRouter([
   {
     path: '/login',
-    element: (
-      <SuspenseWrapper>
-        <LoginPage />
-      </SuspenseWrapper>
-    ),
+    element: <LoginPage />,
   },
   {
     path: '/',

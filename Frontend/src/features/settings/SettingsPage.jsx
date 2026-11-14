@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Settings,
   User,
@@ -12,22 +13,18 @@ import {
 import { useAppStore } from '../../store/useAppStore';
 
 export const SettingsPage = () => {
-  const { user, theme, toggleTheme, logoutUser, showToast, requestConfirm } = useAppStore();
+  const navigate = useNavigate();
+  const { user, theme, toggleTheme, logoutUser, showToast } = useAppStore();
 
-  const handleLogout = () => {
-    requestConfirm({
-      title: 'Sign Out of Cortex AI',
-      message: `Are you sure you want to end your active session as ${user?.name || 'Operator'}?`,
-      confirmText: 'Sign Out',
-      onConfirm: async () => {
-        try {
-          await logoutUser();
-          showToast('Signed out successfully', 'success');
-        } catch (err) {
-          showToast('Error during sign out', 'error');
-        }
-      },
-    });
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      showToast('Signed out successfully', 'success');
+    } catch (err) {
+      console.warn('Logout error:', err);
+    } finally {
+      navigate('/login', { replace: true });
+    }
   };
 
   return (

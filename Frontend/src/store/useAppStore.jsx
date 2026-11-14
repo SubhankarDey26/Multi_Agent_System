@@ -1,14 +1,42 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
+import { Provider } from 'react-redux';
+import { store } from './store';
+import { useAppDispatch, useAppSelector } from './hooks';
+import {
+  verifySession,
+  processGoogleRedirect,
+  logoutUser as logoutUserThunk,
+  setUser,
+  loginDemo,
+  clearUser,
+  setLoadingDone,
+} from './slices/authSlice';
+import {
+  toggleTheme as toggleThemeAction,
+  setTheme as setThemeAction,
+  toggleSidebarCollapse as toggleSidebarCollapseAction,
+  setSidebarCollapsed as setSidebarCollapsedAction,
+  setMobileSidebarOpen as setMobileSidebarOpenAction,
+  showToast as showToastAction,
+  hideToast as hideToastAction,
+  openConfirm as openConfirmAction,
+  closeConfirm as closeConfirmAction,
+} from './slices/uiSlice';
+import {
+  setCurrentConversationId as setCurrentConversationIdAction,
+  addMessage as addMessageAction,
+  clearMessages as clearMessagesAction,
+} from './slices/chatSlice';
 import authService from '../services/authService';
 
-const AppStoreContext = createContext(null);
+/**
+ * AppInitializer component runs inside Redux Provider to trigger session verification on boot
+ */
+const AppInitializer = ({ children }) => {
+  const dispatch = useAppDispatch();
+  const theme = useAppSelector((state) => state.ui.theme);
 
-export const AppStoreProvider = ({ children }) => {
-  // Theme state
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('cortex_theme') || 'dark';
-  });
-
+  // Sync theme class to html/document element
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') {
@@ -18,180 +46,174 @@ export const AppStoreProvider = ({ children }) => {
       root.classList.add('light');
       root.classList.remove('dark');
     }
-    localStorage.setItem('cortex_theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  };
-
-  // Auth state
-  const [user, setUser] = useState(() => {
-    return authService.getStoredUser();
-  });
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-
-  // Automatic session verification via Backend Gateway API (/api/me)
-  // Backend protect middleware verifies the session in Redis (7-Day TTL)
+  // On boot, verify session against backend.
+  // If a valid cached user already exists (from redirect result or demo), skip the
+  // backend round-trip to avoid clearing the user during the race window.
+  const existingUser = useAppSelector((state) => state.auth.user);
   useEffect(() => {
-    let isMounted = true;
-    const verifyUserSession = async () => {
-      try {
-        const remoteUser = await authService.getCurrentUser();
-        if (isMounted) {
-          setUser(remoteUser);
-        }
-      } catch (err) {
-        console.warn('Backend session verification warning:', err);
-      } finally {
-        if (isMounted) {
-          setIsAuthLoading(false);
-        }
-      }
-    };
-
-    verifyUserSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const loginUser = (userData) => {
-    setUser(userData);
-  };
-
-  const logoutUser = async () => {
-    try {
-      await authService.logout();
-    } catch (err) {
-      console.warn('Logout error:', err);
+    if (existingUser) {
+      // User already in Redux (from getStoredUser() initial state) — just mark loading done
+      dispatch(setLoadingDone());
+    } else {
+      // No cached user — verify against backend /api/me
+      dispatch(verifySession());
     }
-    setUser(null);
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const refreshUser = async () => {
-    setIsAuthLoading(true);
-    try {
-      const updated = await authService.getCurrentUser();
-      setUser(updated);
-      return updated;
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
+  return children;
+};
 
-  // Sidebar collapsed state
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    return localStorage.getItem('cortex_sidebar_collapsed') === 'true';
-  });
-
-  const toggleSidebarCollapse = () => {
-    setIsSidebarCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem('cortex_sidebar_collapsed', String(next));
-      return next;
-    });
-  };
-
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-
-  // Workspace conversations & messages state (persisted across page refresh)
-  const [currentConversationId, setCurrentConversationId] = useState(() => {
-    return localStorage.getItem('cortex_current_task_id') || 'workspace-main';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('cortex_current_task_id', currentConversationId);
-  }, [currentConversationId]);
-
-  const [messagesMap, setMessagesMap] = useState(() => {
-    try {
-      const saved = localStorage.getItem('cortex_messages_map');
-      if (saved) return JSON.parse(saved);
-    } catch (err) {
-      console.warn('Failed to parse cortex_messages_map:', err);
-    }
-    return {
-      'workspace-main': [],
-    };
-  });
-
-  useEffect(() => {
-    localStorage.setItem('cortex_messages_map', JSON.stringify(messagesMap));
-  }, [messagesMap]);
-
-  const addMessage = (conversationId, message) => {
-    setMessagesMap((prev) => {
-      const list = prev[conversationId] || [];
-      return {
-        ...prev,
-        [conversationId]: [...list, message],
-      };
-    });
-  };
-
-  // Toast System
-  const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'info', duration = 3000) => {
-    setToast({ message, type, id: Date.now() });
-    setTimeout(() => {
-      setToast(null);
-    }, duration);
-  };
-
-  // Confirm Dialog System
-  const [confirmState, setConfirmState] = useState(null);
-  const requestConfirm = ({ title, message, confirmText = 'Confirm', onConfirm }) => {
-    setConfirmState({
-      title,
-      message,
-      confirmText,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmState(null);
-      },
-      onCancel: () => setConfirmState(null),
-    });
-  };
-
+/**
+ * AppStoreProvider wraps application with Redux Provider
+ */
+export const AppStoreProvider = ({ children }) => {
   return (
-    <AppStoreContext.Provider
-      value={{
-        theme,
-        toggleTheme,
-        user,
-        setUser,
-        isAuthLoading,
-        loginUser,
-        logoutUser,
-        refreshUser,
-        getCurrentUser: () => authService.getCurrentUser(),
-        isSidebarCollapsed,
-        toggleSidebarCollapse,
-        mobileSidebarOpen,
-        setMobileSidebarOpen,
-        currentConversationId,
-        setCurrentConversationId,
-        messagesMap,
-        addMessage,
-        toast,
-        showToast,
-        confirmState,
-        requestConfirm,
-      }}
-    >
-      {children}
-    </AppStoreContext.Provider>
+    <Provider store={store}>
+      <AppInitializer>{children}</AppInitializer>
+    </Provider>
   );
 };
 
+/**
+ * useAppStore hook provides clean unified access to Redux state and actions
+ */
 export const useAppStore = () => {
-  const context = useContext(AppStoreContext);
-  if (!context) {
-    throw new Error('useAppStore must be used within an AppStoreProvider');
-  }
-  return context;
+  const dispatch = useAppDispatch();
+
+  // Redux Selectors
+  const user = useAppSelector((state) => state.auth.user);
+  const isAuthLoading = useAppSelector((state) => state.auth.isAuthLoading);
+  const authError = useAppSelector((state) => state.auth.error);
+
+  const theme = useAppSelector((state) => state.ui.theme);
+  const isSidebarCollapsed = useAppSelector((state) => state.ui.isSidebarCollapsed);
+  const mobileSidebarOpen = useAppSelector((state) => state.ui.mobileSidebarOpen);
+  const toast = useAppSelector((state) => state.ui.toast);
+  const confirmState = useAppSelector((state) => state.ui.confirmState);
+
+  const currentConversationId = useAppSelector((state) => state.chat.currentConversationId);
+  const messagesMap = useAppSelector((state) => state.chat.messagesMap);
+
+  // Auth Dispatches
+  const loginUser = useCallback((userData) => {
+    dispatch(setUser(userData));
+  }, [dispatch]);
+
+  const logoutUser = useCallback(async () => {
+    try {
+      await dispatch(logoutUserThunk()).unwrap();
+    } catch (err) {
+      console.warn('Logout warning:', err);
+      dispatch(clearUser());
+    }
+    return true;
+  }, [dispatch]);
+
+  const refreshUser = useCallback(async () => {
+    return await dispatch(verifySession()).unwrap();
+  }, [dispatch]);
+
+  const handleGoogleRedirect = useCallback(async () => {
+    return await dispatch(processGoogleRedirect()).unwrap();
+  }, [dispatch]);
+
+  // UI Dispatches
+  const toggleTheme = useCallback(() => {
+    dispatch(toggleThemeAction());
+  }, [dispatch]);
+
+  const setTheme = useCallback((newTheme) => {
+    dispatch(setThemeAction(newTheme));
+  }, [dispatch]);
+
+  const toggleSidebarCollapse = useCallback(() => {
+    dispatch(toggleSidebarCollapseAction());
+  }, [dispatch]);
+
+  const setSidebarCollapsed = useCallback((collapsed) => {
+    dispatch(setSidebarCollapsedAction(collapsed));
+  }, [dispatch]);
+
+  const setMobileSidebarOpen = useCallback((open) => {
+    dispatch(setMobileSidebarOpenAction(open));
+  }, [dispatch]);
+
+  const showToast = useCallback((message, type = 'info', duration = 3000) => {
+    dispatch(showToastAction({ message, type }));
+    setTimeout(() => {
+      dispatch(hideToastAction());
+    }, duration);
+  }, [dispatch]);
+
+  const requestConfirm = useCallback(({ title, message, confirmText = 'Confirm', onConfirm }) => {
+    dispatch(
+      openConfirmAction({
+        title,
+        message,
+        confirmText,
+        onConfirm: () => {
+          onConfirm?.();
+          dispatch(closeConfirmAction());
+        },
+        onCancel: () => {
+          dispatch(closeConfirmAction());
+        },
+      })
+    );
+  }, [dispatch]);
+
+  // Chat Dispatches
+  const setCurrentConversationId = useCallback((id) => {
+    dispatch(setCurrentConversationIdAction(id));
+  }, [dispatch]);
+
+  const addMessage = useCallback((conversationId, message) => {
+    dispatch(addMessageAction({ conversationId, message }));
+  }, [dispatch]);
+
+  const clearMessages = useCallback((conversationId) => {
+    dispatch(clearMessagesAction(conversationId));
+  }, [dispatch]);
+
+  return {
+    // Redux State
+    user,
+    isAuthLoading,
+    authError,
+    theme,
+    isSidebarCollapsed,
+    mobileSidebarOpen,
+    toast,
+    confirmState,
+    currentConversationId,
+    messagesMap,
+
+    // Auth Actions
+    loginUser,
+    logoutUser,
+    refreshUser,
+    handleGoogleRedirect,
+    getCurrentUser: () => authService.getCurrentUser(),
+
+    // UI Actions
+    toggleTheme,
+    setTheme,
+    toggleSidebarCollapse,
+    setSidebarCollapsed,
+    setMobileSidebarOpen,
+    showToast,
+    requestConfirm,
+
+    // Chat Actions
+    setCurrentConversationId,
+    addMessage,
+    clearMessages,
+
+    // Raw Redux Dispatch for direct slice actions
+    dispatch,
+  };
 };
 
 export default useAppStore;

@@ -31,22 +31,16 @@ export const Topbar = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setUserMenuOpen(false);
-    requestConfirm({
-      title: 'Sign Out of Cortex AI',
-      message: `Are you sure you want to log out of your session as ${user?.name || 'Operator'}?`,
-      confirmText: 'Sign Out',
-      onConfirm: async () => {
-        try {
-          await logoutUser();
-          showToast('Logged out successfully', 'success');
-          navigate('/login');
-        } catch (err) {
-          showToast('Failed to sign out', 'error');
-        }
-      },
-    });
+    try {
+      await logoutUser();
+      showToast('Logged out successfully', 'success');
+    } catch (err) {
+      console.warn('Logout error:', err);
+    } finally {
+      navigate('/login', { replace: true });
+    }
   };
 
   return (

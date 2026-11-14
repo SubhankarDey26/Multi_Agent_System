@@ -1,4 +1,4 @@
-import { signInWithPopup, signOut } from 'firebase/auth';
+import { signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../../utils/firebase.js';
 import api from '../../utils/axios.js';
 
@@ -84,26 +84,36 @@ export const authService = {
   },
 
   /**
-   * Google Sign-in with Firebase Auth + Backend Auth API
+   * Google Sign-in via REDIRECT (avoids popup unsafe-eval CSP restriction).
+   * Step 1: Call initiateGoogleRedirect() to send browser to Google.
+   * Step 2: On return, call handleGoogleRedirectResult() to complete sign-in.
    */
-  async loginWithGoogle() {
+  initiateGoogleRedirect() {
+    return signInWithRedirect(auth, googleProvider);
+  },
+
+  /**
+   * Called on mount of LoginPage after Google redirects back.
+   * Returns user data if redirect result is present, null otherwise.
+   */
+  async handleGoogleRedirectResult() {
     try {
-      // 1. Authenticate with Firebase Google Provider popup
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await getRedirectResult(auth);
+      if (!result) return null; // No pending redirect result
+
       const firebaseUser = result.user;
       const idToken = await firebaseUser.getIdToken();
 
       let serverUser = null;
       try {
-        // 2. Exchange Firebase token with backend gateway /api/auth/login
+        // Exchange Firebase token with backend gateway /api/auth/login
         // Backend creates Redis session (7 days) and sets httpOnly session cookie
         const response = await api.post('/api/auth/login', { token: idToken });
         serverUser = response.data?.user;
       } catch (backendErr) {
-        console.warn('Backend /api/auth/login request encountered error, using client fallback:', backendErr);
+        console.warn('Backend /api/auth/login error, using Firebase fallback:', backendErr);
       }
 
-      // 3. Construct user model
       const avatarUrl =
         serverUser?.avatar ||
         firebaseUser.photoURL ||
@@ -125,7 +135,8 @@ export const authService = {
       localStorage.setItem('cortex_token', idToken);
       return userData;
     } catch (error) {
-      console.error('Login with Google error:', error);
+      // Ignore cancelled-popup type errors from redirect — not applicable
+      if (error.code === 'auth/popup-closed-by-user') return null;
       throw error;
     }
   },
