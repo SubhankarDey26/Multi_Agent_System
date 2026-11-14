@@ -25,11 +25,10 @@ export const authService = {
       const userData = {
         id: data.userId || data._id || data.id,
         uid: data.userId || data.firebaseUid || data.uid,
-        name: data.name || 'Neural Architect',
+        name: data.name || 'User',
         email: data.email,
         photoURL: avatarUrl,
         avatar: avatarUrl,
-        plan: data.plan || 'Pro Plan',
         isDemo: false,
       };
 
@@ -113,11 +112,10 @@ export const authService = {
       const userData = {
         uid: serverUser?.firebaseUid || firebaseUser.uid,
         id: serverUser?._id,
-        name: serverUser?.name || firebaseUser.displayName || 'Neural Architect',
+        name: serverUser?.name || firebaseUser.displayName || 'User',
         email: serverUser?.email || firebaseUser.email,
         photoURL: avatarUrl,
         avatar: avatarUrl,
-        plan: 'Pro Plan',
         isDemo: false,
       };
 
@@ -133,41 +131,9 @@ export const authService = {
   },
 
   /**
-   * Email/Password Sign-in simulation / instant access
-   */
-  async loginWithEmail(email, password) {
-    if (!email || !password) {
-      throw new Error('Please enter both email and password.');
-    }
-    const cleanName = email.split('@')[0].replace(/[._-]/g, ' ') || 'Enterprise Operator';
-    const formattedName = cleanName
-      .split(' ')
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
-
-    const demoUser = {
-      uid: 'email-usr-' + Date.now(),
-      name: formattedName,
-      email: email,
-      photoURL:
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
-      avatar:
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
-      plan: 'Pro Plan',
-      isDemo: true,
-    };
-
-    const expiresAt = Date.now() + SEVEN_DAYS_MS;
-    localStorage.setItem('cortex_user', JSON.stringify(demoUser));
-    localStorage.setItem('cortex_session_expires', String(expiresAt));
-    localStorage.setItem('cortex_token', 'enterprise-session-token');
-    return demoUser;
-  },
-
-  /**
    * Demo / Instant Sandbox Sign-in for immediate local prototype evaluation
    */
-  loginDemo(email = 'alex.vance@cortex.ai', name = 'Alex Vance') {
+  loginDemo(email = 'developer@cortex.ai', name = 'Cortex Developer') {
     const demoUser = {
       uid: 'demo-user-123',
       name: name,
@@ -176,7 +142,6 @@ export const authService = {
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
       avatar:
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
-      plan: 'Pro Plan',
       isDemo: true,
     };
     const expiresAt = Date.now() + SEVEN_DAYS_MS;

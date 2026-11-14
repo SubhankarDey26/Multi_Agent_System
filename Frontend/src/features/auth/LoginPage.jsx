@@ -2,10 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles,
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
   AlertCircle,
   Loader2,
 } from 'lucide-react';
@@ -16,10 +12,6 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const { loginUser, showToast, user, isAuthLoading } = useAppStore();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberTerminal, setRememberTerminal] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,14 +22,14 @@ export const LoginPage = () => {
     }
   }, [user, isAuthLoading, navigate]);
 
-  // Google SSO Authentication via Firebase + Backend API
+  // Google SSO Authentication via Firebase + Backend API Gateway (/api/auth/login)
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      const user = await authService.loginWithGoogle();
-      loginUser(user);
-      showToast(`Welcome back, ${user.name}!`, 'success');
+      const authData = await authService.loginWithGoogle();
+      loginUser(authData);
+      showToast(`Welcome, ${authData.name}!`, 'success');
       navigate('/agent/chat');
     } catch (err) {
       console.warn('Google sign-in error:', err);
@@ -46,38 +38,17 @@ export const LoginPage = () => {
       } else if (err.code === 'auth/popup-blocked') {
         setError('Popup was blocked by your browser. Please allow popups or use Demo access.');
       } else {
-        setError('Google sign-in failed. You can sign in with Demo Instant Access below.');
+        setError(err.response?.data?.message || err.message || 'Google sign-in failed.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Email & Password Submit
-  const handleEmailSubmit = async (e) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setError('Please provide both email and password.');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
-      const user = await authService.loginWithEmail(email, password);
-      loginUser(user);
-      showToast(`Signed in as ${user.name}`, 'success');
-      navigate('/agent/chat');
-    } catch (err) {
-      setError(err.message || 'Failed to sign in.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Instant Demo Access
+  // Instant Sandbox Demo Access
   const handleDemoAccess = () => {
-    const user = authService.loginDemo('alex.vance@cortex.ai', 'Alex Vance');
-    loginUser(user);
+    const demoUser = authService.loginDemo('developer@cortex.ai', 'Cortex Developer');
+    loginUser(demoUser);
     showToast('Signed in with Demo session', 'success');
     navigate('/agent/chat');
   };
@@ -107,7 +78,6 @@ export const LoginPage = () => {
             <span className="font-bold text-base tracking-tight text-[#F1F5F9]">Cortex AI</span>
           </div>
 
-          {/* Quick Demo Access Trigger */}
           <button
             onClick={handleDemoAccess}
             className="px-3.5 py-1.5 rounded-xl bg-[#181D2A] hover:bg-[#232B3E] text-[#56CFE1] border border-[#232B3E] hover:border-[#56CFE1]/40 text-xs font-medium transition-all active:scale-95 shadow-sm"
@@ -133,7 +103,7 @@ export const LoginPage = () => {
                 Cortex AI
               </h1>
               <p className="text-xs text-[#94A3B8]">
-                Sign in to your account to continue
+                Sign in with your Google account to access your workspace
               </p>
             </div>
 
@@ -145,13 +115,13 @@ export const LoginPage = () => {
               </div>
             )}
 
-            {/* Google Sign-in */}
-            <div className="mb-5">
+            {/* Google Sign-in (Backend Supported: POST /api/auth/login) */}
+            <div className="space-y-4">
               <button
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={loading}
-                className="w-full h-11 px-4 rounded-xl bg-[#181D2A] hover:bg-[#232B3E] text-[#F1F5F9] border border-[#232B3E] hover:border-[#8B7CFF]/40 flex items-center justify-center gap-3 transition-all duration-150 text-xs font-semibold group active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+                className="w-full h-12 px-4 rounded-xl bg-[#181D2A] hover:bg-[#232B3E] text-[#F1F5F9] border border-[#232B3E] hover:border-[#8B7CFF]/50 flex items-center justify-center gap-3 transition-all duration-150 text-xs font-semibold group active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed shadow-md"
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin text-[#8B7CFF]" />
@@ -177,109 +147,16 @@ export const LoginPage = () => {
                 )}
                 <span>Continue with Google</span>
               </button>
-            </div>
 
-            {/* Divider */}
-            <div className="relative flex items-center justify-center my-5">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#232B3E]"></div>
-              </div>
-              <span className="relative px-3 bg-[#121620] sm:bg-[#1a1b21] text-[#94A3B8] text-[11px]">
-                or sign in with email
-              </span>
-            </div>
-
-            {/* Email Form */}
-            <form onSubmit={handleEmailSubmit} className="space-y-3.5">
-              {/* Email */}
-              <div>
-                <label className="block text-[11px] font-medium text-[#94A3B8] mb-1.5" htmlFor="email">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#94A3B8]">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="alex@cortex.ai"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-[#0E1118] border border-[#232B3E] rounded-xl text-xs text-[#F1F5F9] placeholder:text-[#475569] focus:outline-none focus:border-[#8B7CFF] focus:ring-1 focus:ring-[#8B7CFF] transition-all"
-                  />
+              <div className="relative flex items-center justify-center my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#232B3E]"></div>
                 </div>
+                <span className="relative px-3 bg-[#121620] sm:bg-[#1a1b21] text-[#94A3B8] text-[11px]">
+                  or evaluate instantly
+                </span>
               </div>
 
-              {/* Password */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[11px] font-medium text-[#94A3B8]" htmlFor="password">
-                    Password
-                  </label>
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      showToast('Password reset link sent to your email', 'info');
-                    }}
-                    className="text-[11px] text-[#8B7CFF] hover:underline transition-colors"
-                  >
-                    Forgot password?
-                  </a>
-                </div>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#94A3B8]">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="w-full pl-10 pr-10 py-2.5 bg-[#0E1118] border border-[#232B3E] rounded-xl text-xs text-[#F1F5F9] placeholder:text-[#475569] focus:outline-none focus:border-[#8B7CFF] focus:ring-1 focus:ring-[#8B7CFF] transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#94A3B8] hover:text-[#F1F5F9] transition-colors"
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Remember Me */}
-              <div className="flex items-center justify-between pt-0.5">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={rememberTerminal}
-                    onChange={(e) => setRememberTerminal(e.target.checked)}
-                    className="w-4 h-4 rounded bg-[#0E1118] border-[#232B3E] text-[#8B7CFF] focus:ring-0 cursor-pointer accent-[#8B7CFF]"
-                  />
-                  <span className="text-[11px] text-[#94A3B8]">Remember this device</span>
-                </label>
-              </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-11 mt-1 rounded-xl bg-[#8B7CFF] hover:bg-[#7C6BF0] text-[#0B0D12] font-bold text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(139,124,255,0.35)] transition-all duration-150 active:scale-[0.98] disabled:opacity-60"
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-[#0B0D12]" />
-                ) : (
-                  <span>Sign In</span>
-                )}
-              </button>
-            </form>
-
-            {/* Instant Demo Access Button */}
-            <div className="mt-6 pt-5 border-t border-[#232B3E] text-center">
               <button
                 type="button"
                 onClick={handleDemoAccess}
@@ -297,16 +174,8 @@ export const LoginPage = () => {
       <footer className="w-full bg-[#0B0D12] border-t border-[#232B3E] z-20">
         <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <p className="text-[11px] text-[#94A3B8]">
-            © 2026 Cortex AI. All rights reserved.
+            © 2026 Cortex AI. Autonomous Multi-Agent Systems.
           </p>
-          <div className="flex items-center gap-4 text-[11px] text-[#94A3B8]">
-            <a href="#" className="hover:text-[#F1F5F9] transition-colors">
-              Privacy Policy
-            </a>
-            <a href="#" className="hover:text-[#F1F5F9] transition-colors">
-              Terms of Service
-            </a>
-          </div>
         </div>
       </footer>
     </div>
